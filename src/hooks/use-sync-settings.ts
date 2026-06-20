@@ -59,6 +59,7 @@ export function useSyncSettings(): UseSyncSettingsReturn {
     gitea: { ...defaultPlatformStatus },
     s3: { ...defaultPlatformStatus },
     webdav: { ...defaultPlatformStatus },
+    'fast-note-sync': { ...defaultPlatformStatus },
   })
 
   const initialized = useRef(false)

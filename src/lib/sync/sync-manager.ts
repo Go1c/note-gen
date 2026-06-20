@@ -220,6 +220,11 @@ export class SyncManager {
       return { success: true, action: 'none', message: '文件被排除在同步之外' }
     }
 
+    // fast-note-sync 由独立的实时引擎处理，跳过传统 push/pull 路径
+    if ((await this.getCurrentPlatform()) === 'fast-note-sync') {
+      return { success: true, action: 'none', message: 'fast-note-sync 独立引擎处理' }
+    }
+
     try {
       const platform = await this.getCurrentPlatform() as 'github' | 'gitee' | 'gitlab' | 'gitea' | 's3' | 'webdav'
       // S3 不需要 repo，直接设为空字符串
@@ -304,6 +309,10 @@ export class SyncManager {
    * 从远程拉取文件
    */
   async pullFile(path: string): Promise<SyncResult> {
+    // fast-note-sync 由独立的实时引擎处理
+    if ((await this.getCurrentPlatform()) === 'fast-note-sync') {
+      return { success: true, action: 'none', message: 'fast-note-sync 独立引擎处理' }
+    }
     try {
       const platform = await this.getCurrentPlatform() as 'github' | 'gitee' | 'gitlab' | 'gitea' | 's3' | 'webdav'
       // S3 不需要 repo
@@ -394,6 +403,10 @@ export class SyncManager {
    * 删除远程文件
    */
   async deleteRemoteFile(path: string): Promise<SyncResult> {
+    // fast-note-sync 由独立的实时引擎处理
+    if ((await this.getCurrentPlatform()) === 'fast-note-sync') {
+      return { success: true, action: 'none', message: 'fast-note-sync 独立引擎处理' }
+    }
     try {
       const platform = await this.getCurrentPlatform() as 'github' | 'gitee' | 'gitlab' | 'gitea' | 's3' | 'webdav'
       // S3 不需要 repo

@@ -2,8 +2,9 @@ import { endOfWeek, startOfWeek } from 'date-fns'
 
 import type { ActivityCalendarData, ActivityDaySummary } from '@/lib/activity/types'
 import { SyncStateEnum } from '@/lib/sync/github.types'
+import type { SyncPlatform } from '@/types/sync'
 
-type SyncProvider = 'github' | 'gitee' | 'gitlab' | 'gitea' | 's3' | 'webdav'
+type SyncProvider = SyncPlatform
 
 interface BuildProfileCardDataInput {
   primaryBackupMethod: SyncProvider

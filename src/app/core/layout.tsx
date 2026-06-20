@@ -316,6 +316,10 @@ export default function RootLayout({
         await initUpdateStore()
         if (cancelled) return
         checkForUpdates()
+
+        // fast-note-sync：若已选为主后端且配置有效，自动建立实时同步连接
+        const { initFnsIfActive } = await import('@/lib/sync/fns/manager')
+        await initFnsIfActive()
       } catch (error) {
         console.error('Failed to initialize app core:', error)
       }

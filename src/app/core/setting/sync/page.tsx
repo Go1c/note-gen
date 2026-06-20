@@ -7,6 +7,7 @@ import { GitlabSync } from "./gitlab-sync";
 import { GiteaSync } from "./gitea-sync";
 import { S3Sync } from "./s3-sync";
 import { WebDAVSync } from "./webdav-sync";
+import { FastNoteSync } from "./fast-note-sync";
 import { SettingType } from '../components/setting-base';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, RefreshCcw } from "lucide-react"
@@ -79,6 +80,11 @@ export default function SyncPage() {
     const newTab = value as SyncPlatform
     setTab(newTab)
     await setPrimaryBackupMethod(newTab)
+    // 切走 fast-note-sync 时断开其实时连接，避免与其它后端重复上行
+    if (newTab !== 'fast-note-sync') {
+      const { disconnectFns } = await import('@/lib/sync/fns/manager')
+      disconnectFns()
+    }
   }
 
   // 获取当前平台的同步状态
@@ -145,6 +151,8 @@ export default function SyncPage() {
       case 'webdav':
         // TODO: Replace with WebDAV sync component in Task 4
         return <WebDAVSync />
+      case 'fast-note-sync':
+        return <FastNoteSync />
       default:
         return <GithubSync />
     }
