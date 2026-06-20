@@ -96,7 +96,8 @@ export class FnsWsClient {
     })
 
     ws.addEventListener('error', (ev) => {
-      this.opts.onError?.(ev)
+      const msg = ev instanceof ErrorEvent && ev.message ? ev.message : 'WebSocket connection error'
+      this.opts.onError?.(msg)
     })
   }
 

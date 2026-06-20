@@ -1,7 +1,7 @@
 "use client"
 import Image from "next/image"
 import { useState } from "react"
-import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 
 interface ChatImagesProps {
   images: string[]
@@ -36,6 +36,7 @@ export function ChatImages({ images }: ChatImagesProps) {
       {selectedImage && (
         <Dialog open={!!selectedImage} onOpenChange={() => setSelectedImage(null)}>
           <DialogContent className="max-w-4xl max-h-[90vh] p-0">
+            <DialogTitle className="sr-only">Image Preview</DialogTitle>
             <div className="relative w-full h-full flex items-center justify-center p-4">
               <Image
                 src={selectedImage}

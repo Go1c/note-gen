@@ -8,6 +8,7 @@ import { convertFileSrc } from "@tauri-apps/api/core"
 import {
   Dialog,
   DialogContent,
+  DialogTitle,
 } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useEffect, useState, useCallback, useMemo } from "react"
@@ -530,6 +531,7 @@ export function ControlScan() {
             transform: 'none',
           }}
         >
+          <DialogTitle className="sr-only">{t('record.capture.screenshotRecordTitle')}</DialogTitle>
           <div className="flex h-full min-h-0 flex-col gap-4 overflow-hidden">
             <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
               <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 text-xs text-white/75">

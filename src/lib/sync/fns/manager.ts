@@ -7,6 +7,7 @@ import { FNS_CONFIG_KEY, type FastNoteSyncConfig, type SyncPlatform } from '@/ty
 import { FnsClient } from './client'
 import { fullSync, registerUploadHooks } from './orchestrator'
 import useFnsSyncStore from '@/stores/fns-sync'
+import { showErrorTip, classifyError } from '@/lib/error-tips'
 
 let client: FnsClient | null = null
 let cleanupHooks: (() => void) | null = null
@@ -44,7 +45,13 @@ export async function connectFns(cfgOverride?: FastNoteSyncConfig): Promise<bool
   const setStatus = useFnsSyncStore.getState().setStatus
   client = new FnsClient(cfg, {
     onStatusChange: (connected, authed) => setStatus({ connected, authed, lastError: connected ? null : useFnsSyncStore.getState().lastError }),
-    onError: (message) => setStatus({ lastError: message }),
+    onError: (message) => {
+      setStatus({ lastError: message })
+      // 仅鉴权失败这类「可操作」错误弹提示；瞬时连接错误不弹
+      if (classifyError(message, 'sync') === 'sync.authFailed') {
+        showErrorTip('sync.authFailed')
+      }
+    },
     onReady: (c) => {
       setStatus({ syncing: true, lastError: null })
       void fullSync(c).finally(() => setStatus({ syncing: false }))

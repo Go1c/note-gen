@@ -15,7 +15,8 @@ import { getAllMarkdownFiles } from '@/lib/files'
 import { shouldExclude } from '@/config/sync-exclusions'
 import emitter from '@/lib/emitter'
 import type { FnsClient } from './client'
-import { uploadNote } from './operator-note'
+import { uploadNote, deleteNote } from './operator-note'
+import { deleteFolder } from './operator-folder'
 
 function genContext(): string {
   try {
@@ -143,10 +144,26 @@ export function registerUploadHooks(client: FnsClient): () => void {
   }
   emitter.on('article-saved', onSaved)
 
-  // TODO(删除/重命名): note-gen 暂无专用删除/重命名 emitter 事件，需在 article store
-  // 的删除/重命名动作处挂钩调用 deleteNote/renameNote；本期靠下次连接的对账兜底删除。
+  // 本地删除文件/文件夹 → 上行删除（文件夹用 FolderDelete，文件用 NoteDelete）
+  const onDeleted = (e: unknown) => {
+    const evt = e as { path: string; isDir: boolean }
+    if (!evt?.path) return
+    if (!isWatchEnabled()) return                 // 对账期间不上行
+    if (Guard.isIgnored(evt.path)) return         // 这是刚同步下来的删除，跳过
+    if (shouldExclude(evt.path)) return
+    if (evt.isDir) {
+      deleteFolder(client.ctx, evt.path)
+    } else {
+      void deleteNote(client.ctx, evt.path)
+    }
+  }
+  emitter.on('article-deleted', onDeleted)
+
+  // TODO(重命名): note-gen 暂无专用重命名 emitter 事件，需在 article store
+  // 的重命名动作处挂钩调用 renameNote/renameFolder；本期靠下次连接的对账兜底。
 
   return () => {
     emitter.off('article-saved', onSaved)
+    emitter.off('article-deleted', onDeleted)
   }
 }

@@ -129,6 +129,8 @@ interface Events {
     expectedVersion?: number;
     resolve: (result: { success: boolean; insertedLength: number; message?: string; error?: string; newCursorPosition?: number; versionMismatch?: boolean }) => void;
   };
+  // 本地删除文件/文件夹后上行同步（FNS）
+  'article-deleted': { path: string; isDir: boolean };
   [key: string]: unknown;
   [key: symbol]: unknown;
 }

@@ -95,6 +95,7 @@ import { s3Upload, s3Download, s3HeadObject, s3Delete, testS3Connection } from "
 import { webdavUpload, webdavDownload, webdavHeadObject, webdavDelete, testWebDAVConnection } from "@/lib/sync/webdav"
 import { S3Config, WebDAVConfig, SyncPlatform } from "@/types/sync"
 import { filterSyncData, mergeSyncData } from "@/config/sync-exclusions"
+import useFnsSyncStore from "@/stores/fns-sync"
 import { confirm, save, open as openDialog } from "@tauri-apps/plugin-dialog"
 import { invoke } from "@tauri-apps/api/core"
 import { SyncStateEnum } from "@/lib/sync/github.types"
@@ -314,6 +315,7 @@ const DEFAULT_PROVIDER_LIST: ProviderInfo[] = [
   { platform: 'gitea', name: 'Gitea', status: 'unconfigured' },
   { platform: 's3', name: 'S3', status: 'unconfigured' },
   { platform: 'webdav', name: 'WebDAV', status: 'unconfigured' },
+  { platform: 'fast-note-sync', name: 'Fast Note Sync', status: 'unconfigured' },
 ]
 
 interface SyncToggleProps {
@@ -341,6 +343,7 @@ export function SyncToggle({ presentation = 'popover' }: SyncToggleProps) {
     setS3Connected,
     setWebDAVConnected
   } = useSyncStore()
+  const { connected: fnsConnected } = useFnsSyncStore()
 
   const { uploadMarks, downloadMarks, fetchMarks } = useMarkStore()
   const { uploadTags, downloadTags, fetchTags, currentTagId } = useTagStore()
@@ -484,6 +487,14 @@ export function SyncToggle({ presentation = 'popover' }: SyncToggleProps) {
         webdavStatus = webdavConnected ? 'connected' : 'failed'
       }
       providerList.push({ platform: 'webdav', name: 'WebDAV', status: webdavStatus })
+
+      // Fast Note Sync
+      const fnsConfig = await store.get<{ api: string; apiToken: string; vault: string }>('fnsSyncConfig')
+      let fnsStatus: ProviderStatus = 'unconfigured'
+      if (fnsConfig?.api && fnsConfig?.apiToken && fnsConfig?.vault) {
+        fnsStatus = fnsConnected ? 'connected' : 'failed'
+      }
+      providerList.push({ platform: 'fast-note-sync', name: 'Fast Note Sync', status: fnsStatus })
 
       setProviders(providerList)
       } catch (error) {

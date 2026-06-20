@@ -19,6 +19,7 @@ import { SYNC_PLATFORMS, SyncPlatform } from "@/types/sync";
 import { Item, ItemContent, ItemTitle, ItemDescription, ItemActions, ItemMedia } from "@/components/ui/item";
 import useSyncStore from "@/stores/sync";
 import { SyncStateEnum } from "@/lib/sync/github.types";
+import useFnsSyncStore from "@/stores/fns-sync";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -48,6 +49,7 @@ export default function SyncPage() {
     setAutoPullOnSwitch,
   } = useSettingStore()
   const { syncRepoState, giteeSyncRepoState, gitlabSyncProjectState, giteaSyncRepoState, s3Connected, webdavConnected } = useSyncStore()
+  const { connected: fnsConnected } = useFnsSyncStore()
   const { fetchMarks } = useMarkStore()
   const { fetchTags, currentTagId } = useTagStore()
   const { init } = useChatStore()
@@ -102,6 +104,8 @@ export default function SyncPage() {
         return s3Connected ? SyncStateEnum.success : SyncStateEnum.fail
       case 'webdav':
         return webdavConnected ? SyncStateEnum.success : SyncStateEnum.fail
+      case 'fast-note-sync':
+        return fnsConnected ? SyncStateEnum.success : SyncStateEnum.fail
       default:
         return syncRepoState
     }

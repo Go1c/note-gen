@@ -2,6 +2,7 @@ import { Channel, invoke } from '@tauri-apps/api/core'
 import type OpenAI from 'openai'
 import type { ModelsPage } from 'openai/resources/models'
 import type { AiConfig } from '@/app/core/setting/config'
+import { showErrorTip, classifyError } from '@/lib/error-tips'
 
 type JsonValue = Record<string, unknown>
 
@@ -123,6 +124,13 @@ function toAbortError(error: unknown) {
   return new Error(String(error))
 }
 
+/** AI 请求失败 → 可操作的 Tip（网络/鉴权）。用户主动取消（AbortError）不弹。 */
+function maybeShowAiErrorTip(error: unknown) {
+  if (error instanceof Error && error.name === 'AbortError') return
+  const key = classifyError(error, 'ai')
+  if (key) showErrorTip(key)
+}
+
 async function cancelRequest(requestId: string) {
   try {
     await invoke('cancel_ai_request', { requestId })
@@ -159,7 +167,9 @@ export async function invokeAiJson<T = JsonValue>(
       },
     })
   } catch (error) {
-    throw toAbortError(error)
+    const wrapped = toAbortError(error)
+    maybeShowAiErrorTip(wrapped)
+    throw wrapped
   } finally {
     detachAbort()
   }
@@ -180,7 +190,9 @@ export async function invokeAiBinary(
     })
     return Uint8Array.from(response).buffer
   } catch (error) {
-    throw toAbortError(error)
+    const wrapped = toAbortError(error)
+    maybeShowAiErrorTip(wrapped)
+    throw wrapped
   } finally {
     detachAbort()
   }
@@ -200,7 +212,9 @@ export async function invokeAiMultipart<T = JsonValue>(
       },
     })
   } catch (error) {
-    throw toAbortError(error)
+    const wrapped = toAbortError(error)
+    maybeShowAiErrorTip(wrapped)
+    throw wrapped
   } finally {
     detachAbort()
   }
@@ -222,7 +236,9 @@ function createStreamingIterable<T>(
       return
     }
     if (event.type === 'error') {
-      queue.fail(new Error(event.data))
+      const err = new Error(event.data)
+      maybeShowAiErrorTip(err)
+      queue.fail(err)
       return
     }
     queue.close()
@@ -234,7 +250,9 @@ function createStreamingIterable<T>(
   }).then(() => {
     queue.close()
   }).catch((error) => {
-    queue.fail(toAbortError(error))
+    const wrapped = toAbortError(error)
+    maybeShowAiErrorTip(wrapped)
+    queue.fail(wrapped)
   }).finally(() => {
     detachAbort()
   })

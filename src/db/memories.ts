@@ -1,5 +1,11 @@
 import { getDb } from './index'
 import { fetchEmbedding } from '@/lib/ai/embedding'
+import { enqueueAutoDataSync } from '@/lib/sync/auto-data-sync-queue'
+
+/** 记忆变更后触发数据同步（远端写入期间 enqueue 会自动跳过，避免回环） */
+function enqueueMemoriesAutoSync(reason: string) {
+  enqueueAutoDataSync('memories', reason)
+}
 
 export type MemoryCategory = 'preference' | 'memory'
 
@@ -180,7 +186,24 @@ export async function upsertMemory(
     )
   }
 
+  enqueueMemoriesAutoSync(replaced ? 'memory:replace' : 'memory:insert')
   return { id: newId, replaced, replacedId }
+}
+
+/**
+ * 原样批量写入记忆（用于同步还原：不重算 embedding、不去重，保留原 id 与时间戳）
+ */
+export async function insertMemoriesRaw(memories: Memory[]): Promise<void> {
+  const db = await getDb()
+  for (const m of memories) {
+    await db.execute(
+      `insert or replace into memories (id, content, embedding, category, replaced_id,
+       access_count, last_accessed_at, created_at, updated_at)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [m.id, m.content, m.embedding, m.category, m.replacedId ?? null,
+       m.accessCount ?? 0, m.lastAccessedAt ?? null, m.createdAt, m.updatedAt]
+    )
+  }
 }
 
 /**
@@ -299,6 +322,7 @@ export async function updateMemory(
      where id = $5`,
     [updates.content, newEmbedding, newCategory, Date.now(), id]
   )
+  enqueueMemoriesAutoSync('memory:update')
 }
 
 /**
@@ -310,6 +334,7 @@ export async function deleteMemory(id: string): Promise<void> {
     "delete from memories where id = $1",
     [id]
   )
+  enqueueMemoriesAutoSync('memory:delete')
 }
 
 /**
@@ -320,6 +345,7 @@ export async function clearAllMemories(): Promise<void> {
   await db.execute(
     "delete from memories"
   )
+  enqueueMemoriesAutoSync('memory:clear')
 }
 
 /**

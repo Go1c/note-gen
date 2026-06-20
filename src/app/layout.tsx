@@ -7,6 +7,7 @@ import { NextIntlProvider } from "@/components/providers/NextIntlProvider";
 import Script from "next/script";
 import { getSyncPushQueue } from "@/lib/sync/sync-push-queue";
 import { ConsoleFilter } from "@/components/console-filter";
+import { ErrorTipBridge } from "@/components/error-tip-bridge";
 
 export default function RootLayout({
   children,
@@ -44,6 +45,7 @@ export default function RootLayout({
         </head>
         <body suppressHydrationWarning>
           <ConsoleFilter />
+          <ErrorTipBridge />
           <Suspense>
             <NextIntlProvider>
               {children}

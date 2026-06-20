@@ -12,8 +12,8 @@ import { webdavDownload, webdavUpload } from '@/lib/sync/webdav'
 import { setAutoDataSyncApplyingRemote } from '@/lib/sync/auto-data-sync-queue'
 import type { S3Config, WebDAVConfig } from '@/types/sync'
 
-type SettingsSyncProvider = 'github' | 'gitee' | 'gitlab' | 'gitea' | 's3' | 'webdav'
-type GitSettingsSyncProvider = Exclude<SettingsSyncProvider, 's3' | 'webdav'>
+type SettingsSyncProvider = 'github' | 'gitee' | 'gitlab' | 'gitea' | 's3' | 'webdav' | 'fast-note-sync'
+type GitSettingsSyncProvider = Exclude<SettingsSyncProvider, 's3' | 'webdav' | 'fast-note-sync'>
 type RemoteFileEntry = {
   name?: string
   path?: string
@@ -128,6 +128,19 @@ const useSettingsSyncStore = create<SettingsSyncState>((set) => ({
           return true
         }
 
+        return false
+      }
+
+      if (primaryBackupMethod === 'fast-note-sync') {
+        const { getFnsStorageConfig, fnsUpload } = await import('@/lib/sync/fns-storage')
+        const cfg = await getFnsStorageConfig()
+        if (!cfg) return false
+        const result = await fnsUpload(cfg, '.data/settings.json', content)
+        debugSettingsSync('fast-note-sync upload result', { success: Boolean(result) })
+        if (result) {
+          set({ lastSyncTime: new Date().toISOString() })
+          return true
+        }
         return false
       }
 
@@ -247,10 +260,20 @@ const useSettingsSyncStore = create<SettingsSyncState>((set) => ({
         }
 
         remoteSettings = JSON.parse(file.content)
+      } else if (primaryBackupMethod === 'fast-note-sync') {
+        const { getFnsStorageConfig, fnsDownload } = await import('@/lib/sync/fns-storage')
+        const cfg = await getFnsStorageConfig()
+        if (!cfg) return false
+        const content = await fnsDownload(cfg, '.data/settings.json')
+        debugSettingsSync('fast-note-sync download result', { success: Boolean(content) })
+        if (!content) {
+          return Boolean(options.allowMissingRemote)
+        }
+        remoteSettings = JSON.parse(content)
       }
 
       // 获取仓库名称
-      const repoName = primaryBackupMethod === 's3' || primaryBackupMethod === 'webdav'
+      const repoName = primaryBackupMethod === 's3' || primaryBackupMethod === 'webdav' || primaryBackupMethod === 'fast-note-sync'
         ? ''
         : await getSyncRepoName(primaryBackupMethod as GitSettingsSyncProvider)
 

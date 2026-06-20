@@ -7,6 +7,7 @@ import { toast } from '@/hooks/use-toast'
 import { openPath } from '@tauri-apps/plugin-opener'
 import { appDataDir } from '@tauri-apps/api/path'
 import { getFilePathOptions, getWorkspacePath } from '@/lib/workspace'
+import { showErrorTip } from '@/lib/error-tips'
 
 interface FileMetadata {
   size: number
@@ -65,6 +66,10 @@ export function UnsupportedFile({ filePath }: UnsupportedFileProps) {
         })
       } catch (error) {
         console.error('Failed to get file metadata:', error)
+        // 文件在云端已删除 / 尚未下载到本地 → 给可操作的 Tip（刷新文件树）
+        if (String((error as Error)?.message ?? error).includes('No such file or directory')) {
+          showErrorTip('file.missingLocal')
+        }
       } finally {
         setLoading(false)
       }

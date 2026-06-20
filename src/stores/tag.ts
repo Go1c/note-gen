@@ -186,6 +186,14 @@ const useTagStore = create<TagState>((set, get) => ({
         }
         break;
       }
+      case 'fast-note-sync': {
+        const { getFnsStorageConfig, fnsUpload } = await import('@/lib/sync/fns-storage')
+        const fnsCfg = await getFnsStorageConfig()
+        if (fnsCfg) {
+          res = await fnsUpload(fnsCfg, fullPath, JSON.stringify(tags))
+        }
+        break;
+      }
     }
     if (res) {
       result = true
@@ -238,6 +246,18 @@ const useTagStore = create<TagState>((set, get) => ({
           const webdavResult = await webdavDownload(webdavConfig, webdavKey)
           if (webdavResult) {
             result = JSON.parse(webdavResult.content)
+            hasRemoteData = true
+          }
+        }
+        break;
+      }
+      case 'fast-note-sync': {
+        const { getFnsStorageConfig, fnsDownload } = await import('@/lib/sync/fns-storage')
+        const fnsCfg = await getFnsStorageConfig()
+        if (fnsCfg) {
+          const fnsResult = await fnsDownload(fnsCfg, `${path}/${filename}`)
+          if (fnsResult) {
+            result = JSON.parse(fnsResult)
             hasRemoteData = true
           }
         }

@@ -132,6 +132,8 @@ export class FnsClient {
 
     // *SyncEnd：推进 lastTime + 消费内嵌 messages
     if (action.endsWith('SyncEnd')) {
+      // SyncEnd 本身的 vault 就是本连接的 vault，无需额外校验
+      if (payload.vault && payload.vault !== this.ctx.vault) return
       const data = payload.data as SyncEndData | undefined
       if (data?.messages?.length) {
         for (const m of data.messages) await this.dispatchDetail(m.action, m.data)
@@ -146,6 +148,8 @@ export class FnsClient {
     }
 
     // 明细推送（独立帧）
+    // 校验 vault：envelope 携带 vault 且与当前 vault 不符时丢弃，防止多 vault 串扰
+    if (payload.vault && payload.vault !== this.ctx.vault) return
     await this.dispatchDetail(action, payload.data)
   }
 

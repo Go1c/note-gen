@@ -13,6 +13,7 @@ import { S3Config, WebDAVConfig } from "@/types/sync";
 import { cloneDeep } from "lodash-es";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { computedParentPath, getCurrentFolder } from "@/lib/path";
+import emitter from "@/lib/emitter";
 import { toast } from "@/hooks/use-toast";
 import { useTranslations } from "next-intl";
 import useClipboardStore from "@/stores/clipboard";
@@ -252,6 +253,9 @@ export function FileItem({
           // 默认工作区
           await remove(pathOptions.path, { baseDir: pathOptions.baseDir })
         }
+
+        // 上行同步删除（FNS 等实时后端）：本地删除后通知服务端删除对应笔记/文件夹
+        emitter.emit('article-deleted', { path: currentPath, isDir: Boolean(item.isDirectory) })
 
         // 更新文件树
         if (currentFolder) {

@@ -7,8 +7,8 @@ import type { S3Config, WebDAVConfig } from '@/types/sync'
 import type { Mark } from '@/db/marks'
 import type { Tag } from '@/db/tags'
 
-export type AutoDataSyncDomain = 'records' | 'settings'
-type AutoDataSyncProvider = 'github' | 'gitee' | 'gitlab' | 'gitea' | 's3' | 'webdav'
+export type AutoDataSyncDomain = 'records' | 'settings' | 'memories'
+type AutoDataSyncProvider = 'github' | 'gitee' | 'gitlab' | 'gitea' | 's3' | 'webdav' | 'fast-note-sync'
 export type AutoDataSyncPhase =
   | 'idle'
   | 'checking_remote'
@@ -84,7 +84,8 @@ const AUTO_DATA_SYNC_META_PATH = '.data/meta.json'
 const AUTO_DATA_SYNC_TAGS_PATH = '.data/tags.json'
 const AUTO_DATA_SYNC_MARKS_PATH = '.data/marks.json'
 const AUTO_DATA_SYNC_SETTINGS_PATH = '.data/settings.json'
-const AUTO_DATA_SYNC_DOMAINS: AutoDataSyncDomain[] = ['records', 'settings']
+const AUTO_DATA_SYNC_MEMORIES_PATH = '.data/memories.json'
+const AUTO_DATA_SYNC_DOMAINS: AutoDataSyncDomain[] = ['records', 'settings', 'memories']
 const AUTO_DATA_SYNC_DIRTY_DOMAINS_KEY = 'autoDataSyncDirtyDomains'
 const AUTO_DATA_SYNC_LAST_LOCAL_UPLOAD_META_MS_KEY = 'autoDataSyncLastLocalUploadMetaUpdatedAtMs'
 const AUTO_DATA_SYNC_LAST_APPLIED_REMOTE_META_MS_KEY = 'autoDataSyncLastAppliedRemoteMetaUpdatedAtMs'
@@ -369,6 +370,7 @@ export function enqueueAutoDataSync(domain: AutoDataSyncDomain, reason = 'change
 export function enqueueAllAutoDataSync(reason = 'manual-sync', mode: 'auto' | 'manual' = 'manual') {
   enqueueAutoDataSync('records', reason, mode)
   enqueueAutoDataSync('settings', reason, mode)
+  enqueueAutoDataSync('memories', reason, mode)
 }
 
 export async function flushAutoDataSyncNow(): Promise<void> {
@@ -503,16 +505,19 @@ export async function downloadAutoDataSyncNow(
       { default: useMarkStore },
       { default: useSettingsSyncStore },
       { default: useSettingStore },
+      { default: useMemoriesStore },
     ] = await Promise.all([
       import('@/stores/tag'),
       import('@/stores/mark'),
       import('@/stores/settingsSync'),
       import('@/stores/setting'),
+      import('@/stores/memories'),
     ])
 
     const tagResult = await useTagStore.getState().downloadTags({ allowMissingRemote: true })
     const markResult = await useMarkStore.getState().downloadMarks({ allowMissingRemote: true })
     const settingsResult = await useSettingsSyncStore.getState().downloadSettings({ allowMissingRemote: true })
+    await useMemoriesStore.getState().downloadMemories({ allowMissingRemote: true })
     debugAutoDataSync('download domain results', {
       tags: tagResult,
       marks: markResult,
@@ -880,6 +885,11 @@ export async function isAutoDataSyncProviderConfigured(): Promise<boolean> {
       const config = await store.get<WebDAVConfig>('webdavSyncConfig')
       return Boolean(config?.url && config.username && config.password)
     }
+    case 'fast-note-sync': {
+      const { getFnsStorageConfig } = await import('@/lib/sync/fns-storage')
+      const cfg = await getFnsStorageConfig()
+      return cfg !== null
+    }
     default:
       return false
   }
@@ -1144,6 +1154,16 @@ async function uploadDomain(domain: AutoDataSyncDomain) {
     return
   }
 
+  if (domain === 'memories') {
+    const { default: useMemoriesStore } = await import('@/stores/memories')
+    const result = await useMemoriesStore.getState().uploadMemories()
+    debugAutoDataSync('memories upload result', { memories: result })
+    if (!result) {
+      throw new Error('Failed to upload memories')
+    }
+    return
+  }
+
   const { default: useSettingsSyncStore } = await import('@/stores/settingsSync')
   const result = await useSettingsSyncStore.getState().uploadSettings()
   debugAutoDataSync('settings upload result', { settings: result })
@@ -1168,6 +1188,7 @@ async function uploadAutoDataSyncMeta(uploadedDomains: AutoDataSyncDomain[]) {
     files: {
       records: [AUTO_DATA_SYNC_TAGS_PATH, AUTO_DATA_SYNC_MARKS_PATH],
       settings: [AUTO_DATA_SYNC_SETTINGS_PATH],
+      memories: [AUTO_DATA_SYNC_MEMORIES_PATH],
       meta: AUTO_DATA_SYNC_META_PATH,
     },
     appVersion: await getAppVersion(),
@@ -1192,6 +1213,9 @@ async function uploadAutoDataSyncMeta(uploadedDomains: AutoDataSyncDomain[]) {
       break
     case 'webdav':
       await uploadWebDAVMetaFile(store, content)
+      break
+    case 'fast-note-sync':
+      await uploadFnsMetaFile(content)
       break
     default:
       throw new Error('Sync provider is not configured')
@@ -1771,6 +1795,12 @@ async function downloadAutoDataSyncRemoteFileContent(
       const file = await webdavDownload(config, path)
       return file?.content || null
     }
+    case 'fast-note-sync': {
+      const { getFnsStorageConfig, fnsDownload } = await import('@/lib/sync/fns-storage')
+      const cfg = await getFnsStorageConfig()
+      if (!cfg) return null
+      return await fnsDownload(cfg, path)
+    }
   }
 }
 
@@ -1841,6 +1871,13 @@ async function downloadAutoDataSyncMeta(
       content = file?.content || null
       break
     }
+    case 'fast-note-sync': {
+      const { getFnsStorageConfig, fnsDownload } = await import('@/lib/sync/fns-storage')
+      const cfg = await getFnsStorageConfig()
+      if (!cfg) return null
+      content = await fnsDownload(cfg, AUTO_DATA_SYNC_META_PATH)
+      break
+    }
   }
 
   return parseAutoDataSyncMeta(content)
@@ -1902,7 +1939,7 @@ function normalizeAutoDataSyncDomains(value: unknown): AutoDataSyncDomain[] {
 }
 
 function isAutoDataSyncDomain(value: unknown): value is AutoDataSyncDomain {
-  return value === 'records' || value === 'settings'
+  return value === 'records' || value === 'settings' || value === 'memories'
 }
 
 async function getAutoDataSyncProvider(store: Store): Promise<AutoDataSyncProvider> {
@@ -1914,7 +1951,8 @@ async function getAutoDataSyncProvider(store: Store): Promise<AutoDataSyncProvid
     provider === 'gitlab' ||
     provider === 'gitea' ||
     provider === 's3' ||
-    provider === 'webdav'
+    provider === 'webdav' ||
+    provider === 'fast-note-sync'
   ) {
     return provider
   }
@@ -2163,6 +2201,23 @@ async function uploadWebDAVMetaFile(store: Store, content: string) {
   }
   debugAutoDataSync('meta upload completed', {
     provider: 'webdav',
+    path: AUTO_DATA_SYNC_META_PATH,
+  })
+}
+
+async function uploadFnsMetaFile(content: string) {
+  const { getFnsStorageConfig, fnsUpload } = await import('@/lib/sync/fns-storage')
+  const cfg = await getFnsStorageConfig()
+  if (!cfg) {
+    throw new Error('fast-note-sync config is not configured')
+  }
+
+  const result = await fnsUpload(cfg, AUTO_DATA_SYNC_META_PATH, content)
+  if (!result) {
+    throw new Error('Failed to upload auto data sync metadata')
+  }
+  debugAutoDataSync('meta upload completed', {
+    provider: 'fast-note-sync',
     path: AUTO_DATA_SYNC_META_PATH,
   })
 }
